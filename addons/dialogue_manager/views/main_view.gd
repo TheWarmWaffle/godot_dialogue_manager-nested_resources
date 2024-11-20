@@ -94,7 +94,8 @@ var current_file_path: String = "":
 			code_edit.hide()
 			errors_panel.hide()
 		else:
-			test_button.disabled = false
+			# test scene does not work on nested resources.
+			test_button.disabled = open_buffers[current_file_path].has("resource")
 			search_button.disabled = false
 			insert_button.disabled = false
 			translations_button.disabled = false
@@ -248,11 +249,15 @@ func new_file(path: String, content: String = "") -> void:
 
 	plugin.get_editor_interface().get_resource_filesystem().scan()
 
+func is_path_nested(path: String) -> bool:
+	return "::" in path
 
 # Open a dialogue resource for editing
 func open_resource(resource: DialogueResource) -> void:
-	open_file(resource.resource_path)
-
+	if is_path_nested(resource.resource_path):
+		open_nested_resource(resource)
+	else:
+		open_file(resource.resource_path)
 
 func open_file(path: String) -> void:
 	if not FileAccess.file_exists(path): return
@@ -260,12 +265,7 @@ func open_file(path: String) -> void:
 	if not open_buffers.has(path):
 		var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 		var text = file.get_as_text()
-
-		open_buffers[path] = {
-			cursor = Vector2.ZERO,
-			text = text,
-			pristine_text = text
-		}
+		add_file_to_open_buffers(path, text)
 
 	DialogueSettings.add_recent_file(path)
 	build_open_menu()
@@ -275,6 +275,26 @@ func open_file(path: String) -> void:
 
 	self.current_file_path = path
 
+func open_nested_resource(resource: DialogueResource) -> void:
+	if resource == null: return
+
+	if not open_buffers.has(resource.resource_path):
+		add_file_to_open_buffers(resource.resource_path, resource.raw_text)
+		open_buffers[resource.resource_path]["resource"] = resource
+
+	build_open_menu()
+
+	files_list.files = open_buffers.keys()
+	files_list.select_file(resource.resource_path)
+
+	self.current_file_path = resource.resource_path
+
+func add_file_to_open_buffers(path: String, _raw_text: String, _cursor: Vector2 = Vector2.ZERO) -> void:
+	open_buffers[path] = {
+		cursor = _cursor,
+		text = _raw_text,
+		pristine_text = _raw_text
+	}
 
 func show_file_in_filesystem(path: String) -> void:
 	var file_system_dock: FileSystemDock = plugin \
@@ -290,7 +310,8 @@ func save_files() -> void:
 
 	var saved_files: PackedStringArray = []
 	for path in open_buffers:
-		if open_buffers[path].text != open_buffers[path].pristine_text:
+		var buffer = open_buffers[path]
+		if buffer.text != buffer.pristine_text and !buffer.has("resource"):
 			saved_files.append(path)
 		save_file(path, false)
 
@@ -311,10 +332,14 @@ func save_file(path: String, rescan_file_system: bool = true) -> void:
 
 	buffer.pristine_text = buffer.text
 
-	# Save the current text
-	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
-	file.store_string(buffer.text)
-	file.close()
+	if buffer.has("resource"):
+		var resource = buffer.resource
+		resource.raw_text = buffer.text
+	else:
+		# Save the current text to file
+		var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+		file.store_string(buffer.text)
+		file.close()
 
 	if rescan_file_system:
 		plugin \
@@ -494,7 +519,8 @@ func get_last_export_path(extension: String) -> String:
 func parse() -> void:
 	# Skip if nothing to parse
 	if current_file_path == "": return
-
+	if is_path_nested(current_file_path): return
+	
 	var parser = DialogueManagerParser.new()
 	var errors: Array[Dictionary] = []
 	if parser.parse(code_edit.text, current_file_path) != OK:
@@ -1051,7 +1077,9 @@ func _on_settings_view_script_button_pressed(path: String) -> void:
 
 func _on_test_button_pressed() -> void:
 	save_file(current_file_path)
-
+	if open_buffers[current_file_path].has("resource"):
+		assert("Can't run test scene on nested DialogueResources")
+		return
 	if errors_panel.errors.size() > 0:
 		errors_dialog.popup_centered()
 		return

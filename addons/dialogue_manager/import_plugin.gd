@@ -63,6 +63,7 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> Error:
+	print("Import ", source_file)
 	var cache = Engine.get_meta("DialogueCache")
 
 	# Get the raw file contents

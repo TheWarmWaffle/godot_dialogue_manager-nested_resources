@@ -1,0 +1,16 @@
+[remap]
+
+importer="adplugstr"
+type="AudioStreamAdlib"
+uid="uid://42367hcwkp28"
+path="res://.godot/imported/LICENSE-d9496dd7eed38c2a1293d15b2f655282.adplugstr"
+
+[deps]
+
+source_file="res://addons/dialogue_manager/LICENSE"
+dest_files=["res://.godot/imported/LICENSE-d9496dd7eed38c2a1293d15b2f655282.adplugstr"]
+
+[params]
+
+loop=false
+chipset=3

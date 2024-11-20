@@ -33,9 +33,6 @@ func _enter_tree() -> void:
 		import_plugin = DialogueImportPlugin.new()
 		add_import_plugin(import_plugin)
 
-		inspector_plugin = DialogueInspectorPlugin.new()
-		add_inspector_plugin(inspector_plugin)
-
 		translation_parser_plugin = DialogueTranslationParserPlugin.new()
 		add_translation_parser_plugin(translation_parser_plugin)
 
@@ -43,6 +40,10 @@ func _enter_tree() -> void:
 		get_editor_interface().get_editor_main_screen().add_child(main_view)
 		_make_visible(false)
 		main_view.add_child(dialogue_cache)
+
+		inspector_plugin = DialogueInspectorPlugin.new()
+		inspector_plugin.main_view = main_view
+		add_inspector_plugin(inspector_plugin)
 
 		_update_localization()
 
