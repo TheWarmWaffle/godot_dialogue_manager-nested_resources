@@ -308,16 +308,61 @@ func show_file_in_filesystem(path: String) -> void:
 func save_files() -> void:
 	save_all_button.disabled = true
 
-	var saved_files: PackedStringArray = []
+	var files_to_reimport: PackedStringArray = []
+	var resources_to_update: Array[DialogueResource] = []
 	for path in open_buffers:
 		var buffer = open_buffers[path]
-		if buffer.text != buffer.pristine_text and !buffer.has("resource"):
-			saved_files.append(path)
+		if buffer.text != buffer.pristine_text:
+			if buffer.has("resource"):
+				resources_to_update.append(buffer.resource)
+			else:
+				files_to_reimport.append(path)
 		save_file(path, false)
 
-	if saved_files.size() > 0:
-		Engine.get_meta("DialogueCache").reimport_files(saved_files)
+	if !files_to_reimport.is_empty():
+		Engine.get_meta("DialogueCache").reimport_files(files_to_reimport)
+	for resource in resources_to_update:
+		update_meta_for_dialogue_resource(resource)
 
+func update_meta_for_dialogue_resource(resource: DialogueResource) -> Error:
+	var cache = Engine.get_meta("DialogueCache")
+
+	# Parse the text
+	var parser: DialogueManagerParser = DialogueManagerParser.new()
+	var err: Error = parser.parse(resource.raw_text, "")
+	var data: DialogueManagerParseResult = parser.get_data()
+	var errors: Array[Dictionary] = parser.get_errors()
+	parser.free()
+
+	if err != OK:
+		printerr("%d errors found in %s" % [errors.size(), resource.resource_path])
+		cache.add_errors_to_file(resource.resource_path, errors)
+		return err
+
+	# Get the current addon version
+	var config: ConfigFile = ConfigFile.new()
+	config.load("res://addons/dialogue_manager/plugin.cfg")
+	var version: String = config.get_value("plugin", "version")
+
+	# Save the results to a resource
+	resource.set_meta("dialogue_manager_version", version)
+
+	resource.using_states = data.using_states
+	resource.titles = data.titles
+	resource.first_title = data.first_title
+	resource.character_names = data.character_names
+	resource.lines = data.lines
+	resource.raw_text = data.raw_text
+
+	# Clear errors and possibly trigger any cascade recompiles
+	cache.add_file(resource.resource_path, data)
+
+	# Recompile any dependencies
+	var dependent_paths: PackedStringArray = cache.get_dependent_paths_for_reimport(resource.resource_path)
+	#for path in dependent_paths: # Certainly seems important.
+		#append_import_external_resource(path)
+
+	return err
 
 # Save a file
 func save_file(path: String, rescan_file_system: bool = true) -> void:
