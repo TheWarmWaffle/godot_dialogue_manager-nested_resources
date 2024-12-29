@@ -4,7 +4,7 @@ extends EditorInspectorPlugin
 
 const DialogueEditorProperty = preload("./components/editor_property/editor_property.gd")
 var main_view # main view reference.
-
+var edit_button: Button = null
 func _can_handle(object) -> bool:
 	if object is DialogueResource: return true
 	
@@ -30,5 +30,8 @@ func _parse_begin(object: Object) -> void:
 
 func _edit(object) -> void:
 	if is_instance_valid(main_view) and is_instance_valid(object):
+		if object.resource_path.is_empty():
+			push_warning("Need to save before editing a SubResource Dialogue.")
+			return
 		main_view.open_resource(object)
 		EditorInterface.set_main_screen_editor("Dialogue")
